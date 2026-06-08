@@ -1,0 +1,961 @@
+#for debugging
+#options(shiny.sanitize.errors = FALSE)
+#options(shiny.fullstacktrace = TRUE)
+
+# Sourcing R files
+source("R/SCAN.R", local = TRUE)
+source("R/ERA5.R", local = TRUE)
+source("R/GLDAS.R", local = TRUE)
+source("R/GRIDMET.R", local = TRUE)
+source("R/NOAA NCDC.R", local = TRUE)
+source("R/microclimUS.R", local = TRUE)
+source("R/microclim.R", local = TRUE)
+source("R/SNODAS.R", local = TRUE)
+source("R/USCRN.R", local = TRUE)
+source("R/NCEP.R", local = TRUE)
+source("R/micro_ncep.R", local = TRUE)
+source("R/micro_usa.r", local = TRUE)
+source("R/micro_era5.R", local = TRUE)
+source("R/micro_global.R", local = TRUE)
+source("R/NEW01.R", local = TRUE)
+source("cicerone.R", local= TRUE)
+source("functions.R", local = TRUE)
+options(shiny.sanitize.errors = FALSE)
+
+
+variables <- c("Surface temperature", "Air temperature", "Soil temperature (1 m deep)", "Radiation", "Wind speed", "Precipitation", "Relative humidity", "Soil moisture", "Snow Depth")
+
+varsDf <- data.frame(row.names = c(variables, "Tmin"),
+                     "ERA5" = c(4, 3, 6, 7, 1, 8, NA, NA, 5, 9),
+                     "ERA51cm" = c(4, 3, 6, 7, 1, 8, NA, NA, 5, 9),
+                     "GLDAS" = c("AvgSurfT_inst", "Tair_f_inst", "SoilTMP40_100cm_inst", "SWdown_f_tavg", "Wind_f_inst", "Rainf_f_tavg", "Qair_f_inst", "SoilMoi40_100cm_inst", "SnowDepth_inst", "Tmin"),
+                     "GLDAS1cm" = c("AvgSurfT_inst", "Tair_f_inst", "SoilTMP40_100cm_inst", "SWdown_f_tavg", "Wind_f_inst", "Rainf_f_tavg", "Qair_f_inst", "SoilMoi40_100cm_inst", "SnowDepth_inst", "Tmin"),
+                     "GRIDMET" = c(NA, "tmax", NA, "srad", "wind_vel", "prcp", NA, NA, NA, "tmin"),
+                     "microclimUS" = c("soil0cm_0pctShade", "TA1cm_0pctShade", "soil100cm_0pctShade", "SOLR", "V1cm", NA, "RH1cm_0pctShade", "moist100cm_0pctShade", "SNOWDEP_0pctShade", "Tmin"),
+                     "microclim" = c("D0cm_soil_0", "TA1cm_soil_0", "D100cm_soil_0", "SOLR", "V1cm", NA, "RH1cm_soil_0", NA, NA, "Tmin"),
+                     "USCRN" = c("SUR_TEMP", "T_MAX", "SOIL_TEMP_100", "SOLARAD", NA, NA, "RH_HR_AVG", "SOIL_MOISTURE_100", NA, NA),
+                     "USCRN1cm" = c("SUR_TEMP", "T_MAX", "SOIL_TEMP_100", "SOLARAD", NA, NA, "RH_HR_AVG", "SOIL_MOISTURE_100", NA, NA),
+                     "NCEP" = c("skt","air","tmp","csdsf","uwnd","prate",NA,"soilw",NA,NA),
+                     "NCEP1cm" = c("skt","air","tmp","csdsf","uwnd","prate",NA,"soilw",NA,NA),
+                     "micro_ncep" = c("D0cm", "TALOC", "D100cm", "SOLR", "VLOC", NA, "RHLOC", NA, "SNOWDEP", NA),
+                     "micro_usa" = c("D0cm", "TALOC", "D100cm", "SOLR", "VLOC", NA, "RHLOC", NA, "SNOWDEP", NA),
+                     "micro_global" = c("D0cm", "TALOC", "D100cm", "SOLR", "VLOC", NA, "RHLOC", NA, "SNOWDEP", NA),
+                     "micro_era5" = c("D0cm", "TALOC", "D100cm", "SOLR", "VLOC", NA, "RHLOC", NA, "SNOWDEP", NA),
+                     "NOAA_NCDC" = c(NA, "TMAX", NA, NA, NA, "PRCP", NA, NA, "SNWD", "TMIN"),
+                     "NEW01" = c(NA, "TMAXX", NA, NA, "WNMAXX", "RAINFALL", "RHMAXX", NA, NA, "TMINN"))
+
+colorsDf <- data.frame(row.names = c("color"),
+                     "ERA5" = c('#04d9ff'),
+                     "GLDAS" = c('#ff7f0e'),
+                     "GRIDMET" = c('#2ca02c'),
+                     "NOAA_NCDC" = c('39FF14'),
+                     "microclimUS" = c('ff00c8'),
+                     "microclim" = c('160ef0'),
+                     "USCRN" = c('#000000'),
+                     "NCEP" = c('#7f7f7f'),
+                     "micro_ncep" = c('#bcbd22'),
+                     "micro_usa" = c('#6a40c6'),
+                     "micro_global" = c('#a99261'),
+                     "NEW01" = c('#DF382B'))
+
+nameDf <- data.frame(row.names = variables,
+                     "ERA5" = c("Hourly skin temperature", "Hourly air temperature 2 m aboveground", "Hourly soil temperature 28-100 cm below ground", "Hourly surface net solar radiation", "Hourly wind speed 10 m above ground", "Total precipitation", NA, NA, "Hourly snow depth"),
+                     "ERA51cm" = c("Hourly skin temperature", "Hourly air temperature 2 m aboveground", "Hourly soil temperature 28-100 cm below ground", "Hourly surface net solar radiation", "Hourly wind speed 10 m above ground", "Total precipitation", NA, NA, "Hourly snow depth"),
+                     "GLDAS" = c("3-hourly average surface skin temperature", "3-hourly average air temperature", "3-hourly average soil temperature 40-100 cm below ground", "3-hourly net longwave radiation flux", "3-hourly average wind speed", "Total precipitation", "3-hourly relative humidity", "3-hourly average soil moisture 40-100 cm below ground", "3-hourly snow depth"),
+                     "GLDAS1cm" = c("3-hourly average surface skin temperature", "3-hourly average air temperature", "3-hourly average soil temperature 40-100 cm below ground", "3-hourly net longwave radiation flux", "3-hourly average wind speed", "Total precipitation", "3-hourly relative humidity", "3-hourly average soil moisture 40-100 cm below ground", "3-hourly snow depth"),
+                     "GRIDMET" = c(NA, "Daily Tmax and Tmin", NA, "Daily mean shortwave radiation at surface", "Daily mean wind speed", "Daily precipitation amount", NA, NA, NA),
+                     "microclimUS" = c("Hourly surface temperature (0% shade)", "Hourly air temperature 1cm above ground", "Hourly soil temperature 1m belowground (0 % shade)", "Hourly solar radiation (horizontal ground)", "Wind speed 1cm aboveground", NA, "Relative humidity 1cm aboveground", "Hourly soil moisture 1m belowground (0 % shade)", NA),
+                     "microclim" = c("Surface temperature (0% shade)", "Air temperature 1cm aboveground", "Soil temperature 1m belowground", "Solar radiation", "Wind speed 1cm aboveground", NA, "Relative humidity 1cm aboveground", NA, NA),
+                     "USCRN" = c("Hourly infrared surface temperature", "Hourly air temperature", "Hourly soil temperature 1m belowground", "Average global solar radiation received", NA, NA, "Hourly relative humidity", "Hourly soil moisture 1m belowground", NA),
+                     "USCRN1cm" = c("Hourly infrared surface temperature", "Hourly air temperature", "Hourly soil temperature 1m belowground", "Average global solar radiation received", NA, NA, "Hourly relative humidity", "Hourly soil moisture 1m belowground", NA),
+                     "NCEP" = c("Land Skin Temperature","Air temperature at 2m","Temperature between 10-200cm below ground level","Clear Sky Downward Solar Flux at surface","Wind speed at 10m","Daily Precipitation Rate at surface","Specific Humidity at 2m","Volumetric Soil Moisture between 10-200cm Below Ground Level",NA),
+                     "NCEP1cm" = c("Land Skin Temperature","Air temperature at 2m","Temperature between 10-200cm below ground level","Clear Sky Downward Solar Flux at surface","Wind speed at 10m","Daily Precipitation Rate at surface","Specific Humidity at 2m","Volumetric Soil Moisture between 10-200cm Below Ground Level",NA),
+                     "micro_ncep" = c("Hourly soil temperature at 0cm", "Hourly air temperature 1cm above ground", "Hourly soil temperature 1m below ground", "Hourly solar radiation, unshaded", "Hourly wind speed 1cm above ground", NA, "Hourly relative humidity 1cm above ground", NA, "Hourly predicted snow depth"),
+                     "micro_usa" = c("Hourly soil temperature at 0cm", "Hourly air temperature 1cm above ground", "Hourly soil temperature 1m below ground", "Hourly solar radiation, unshaded", "Hourly wind speed 1cm above ground", NA, "Hourly relative humidity 1cm above ground", NA, "Hourly predicted snow depth"),
+                     "micro_global" = c("Hourly soil temperature at 0cm", "Hourly air temperature 1cm above ground", "Hourly soil temperature 1m below ground", "Hourly solar radiation, unshaded", "Hourly wind speed 1cm above ground", NA, "Hourly relative humidity 1cm above ground", NA, "Hourly predicted snow depth"),
+                     "micro_era5" = c("Hourly soil temperature at 0cm", "Hourly air temperature 1cm above ground", "Hourly soil temperature 1m below ground", "Hourly solar radiation, unshaded", "Hourly wind speed 1cm above ground", NA, "Hourly relative humidity 1cm above ground", NA, "Hourly predicted snow depth"),
+                     "NOAA_NCDC" = c(NA, "Daily Tmax and Tmin", NA, NA, NA, "Daily precipitation", NA, NA, "Daily snow Depth"),
+                     "NEW01" = c(NA, "Maximum monthly air temperature (C)", NA, NA, "Maximum 10m monthly wind speed (m/s)", "Total rainfall during that month (mm/month)", "% Relative humidity", NA, NA))
+
+datasets <- colnames(varsDf)
+
+
+
+
+shinyServer <- function(input, output, session) {
+  
+  # Guided tour
+  observeEvent(input$tour1, guide1$init()$start())
+  
+  observeEvent(input$reset1, {reset("page")})
+  
+  observeEvent(input$tour2, guide2$init()$start())
+  
+  observeEvent(input$reset2, {reset("page")})
+  
+  
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  #______________________________Data selection________________________________
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  
+  output$mytable <- DT::renderDataTable({
+    req(input$tempRes)   # replaces validate(need(input$tempRes, "..."))
+    
+    dataTable <- readxl::read_xlsx("Data/DatasetTable.xlsx") %>%
+      as.data.frame() %>%
+      mutate(across(everything(), as.character))
+    
+    if (length(input$tempRes) == 1 && input$tempRes == "3-hourly") { # USCRN has TempRes of "Sub-hourly, Hourly, Daily"
+      dataTable <- filter(dataTable, TempRes %in% "3-hourly")
+    } else {
+      dataTable <- filter(dataTable, TempRes %in% c(input$tempRes, "Sub-hourly, Hourly, Daily"))
+    }
+    
+    if (input$spaCov == "Outside of US") { # When "US" is selected, datasets of global spatial coverage are listed as well
+      dataTable <- filter(dataTable, SpatCov != "US")
+    }
+    
+    for (var in input$varTable) {
+      dataTable <- dataTable[dataTable[, var] == "T", ]
+    }
+    
+    if (nrow(dataTable) > 0) {
+      dataTable$TempCovRange <- paste0(dataTable$TempCovStart, "-", dataTable$TempCovEnd)
+    } else {
+      dataTable <- cbind(dataTable, data.frame("TempCovRange" = character(0)))
+    }
+    dataTable[dataTable == "NA-NA"] <- "Infinite"
+    dataTable[dataTable == "T"] <- "<span class='glyphicon glyphicon-ok'></span>"
+    dataTable[dataTable == "F"] <- "<span class='glyphicon glyphicon-remove'></span>"
+    dataTable[is.na(dataTable)] <- ""  # also replace NAs to avoid issues
+    
+    datatable(dataTable, escape = FALSE)
+  })
+  
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  #______________________________Temporal comparison___________________________
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  
+  output$datasetsOutputTemp1 <- renderUI({
+    
+    sets <- c("USCRN","ERA5","GLDAS","GRIDMET","NEW01","NCEP","NOAA_NCDC")
+    index <- which(!is.na(varsDf[input$var, sets]))
+    
+    pickerInput("datasets", "Forcing & Station Datasets", 
+                choices = sets[index],
+                selected = "USCRN", multiple = T, 
+                options = list(style = "btn-success", `actions-box` = TRUE))
+  })
+  
+  output$datasetsOutputTemp2 <- renderUI({
+    
+    sets <- c("USCRN1cm","ERA51cm","GLDAS1cm","NCEP1cm","microclimUS","microclim","micro_ncep","micro_usa","micro_global","micro_era5")
+    index <- which(!is.na(varsDf[input$var, sets]))
+    
+    pickerInput("datasetstemp2", "Microclimate Functions & Downscaled (1cm) Datasets", 
+                choices = sets[index], selected=NA, multiple = T, 
+                options = list(style = "btn-success", `actions-box` = TRUE))
+  })
+  
+
+  output$info <- renderUI({
+    if (input$loc == "OR") {
+      station <- "OR John Day 35 WNW (-119.65°, 44.55°)"
+      loc_label <- "John Day, OR, 2267ft"
+    } else if (input$loc == "CO") {
+      station <- "CO Nunn 7 NNE (-104.73°, 40.87°)"
+      loc_label <- "Weld county, CO 5900ft"
+    } else if (input$loc == "HI") {
+      station <- "HI Hilo 5 S (-155.07°, 19.7°)"
+      loc_label <- "Hilo, Hawaii 62ft"
+    }
+    
+    month <- ifelse(input$season == 1, "January", "July")
+    
+    # Build dataset description text
+    text <- ""
+    for (method in input$datasets) {
+      text <- paste0(text, "<b>", method, ":</b> ", nameDf[input$var, method], "<br>")
+    }
+    for (method in input$datasetstemp2) {
+      text <- paste0(text, "<b>", method, ":</b> ", nameDf[input$var, method], "<br>")
+    }
+    
+    HTML(paste0(
+      "<b>Data showing</b><br>",
+      "<b>Station:</b> ", station, "<br>",
+      "<b>Location:</b> ", loc_label, "<br>",
+      "<b>Month:</b> ", month, "<br><br>",
+      text
+    ))
+  })
+  
+  
+  output$plot <- renderPlotly({
+    req(input$datasets)
+  
+    if (input$var == "Wind speed") unit <- "(m/s)"
+    else if (input$var == "Radiation") unit <- "(W/m\u00B2)"
+    else if (input$var %in% c("Precipitation", "Snow Depth")) unit <- "(mm)"
+    else if (input$var %in% c("Relative humidity", "Soil moisture")) unit <- "(%)"
+    else unit <- "(°C)"
+    
+    p <- plot_ly()
+
+    i = 0
+    for (method in append(input$datasets,input$datasetstemp2)) {
+      i = i + 1
+      inputVar <- varsDf[input$var, method]
+      
+      if (!is.na(inputVar)) {
+        if (input$loc != "HI" || !method %in% c("GRIDMET", "microclimUS", "micro_usa")) {  # Won't run when HI and the three datasets that don't have data for PR are selected 
+          df <- grabAnyData(method, inputVar, input$loc, input$season)
+          
+          if(method=="NEW01") p <- p %>% add_trace(x = as.POSIXct(df$Date), y = df$Data, name = method, marker = list(color = colorsDf["color", method]), mode = 'markers')
+          else p <- p %>% add_lines(x = as.POSIXct(df$Date), y = df$Data, name = method, line = list(color = colorsDf["color", method]))
+        
+        }
+      }
+    }
+    
+    # Adding  GRIDMET and NOAA_NCDC Tmin when Air temperature is selected
+    if (input$var == "Air temperature") {
+      for (method in append(input$datasets,input$datasetstemp2)) {
+        inputVar <- varsDf["Tmin", method]
+        if (method %in% c("GRIDMET", "NOAA_NCDC", "NEW01")) { # gridMET and NOAA NCDC have daily Tmax and Tmin
+          if (input$loc != "HI" || !method == "GRIDMET") { # gridMET doesn't have data for PR
+            
+            df <- grabAnyData(method, inputVar, input$loc, input$season)
+            
+            if(method=="NEW01") p <- p %>% add_trace(x = as.POSIXct(df$Date), y = df$Data, name = paste(method, "Tmin"), marker = list(color = colorsDf["color", method]), mode = 'markers')
+            else p <- p %>% add_lines(x = as.POSIXct(df$Date), y = df$Data, name = paste(method, "Tmin"), line = list(color = colorsDf["color", method]))
+          }
+        }
+      }
+    }
+    
+    month <- ifelse(input$season == 1, "January", "July")
+    if (input$loc == "OR") {
+      loc <- "John Day, Oregon"
+    } else if (input$loc == "CO") {
+      loc <- "Weld county, Colorado"
+    } else if (input$loc == "HI") {
+      loc <- "Hilo, Hawaii"
+    }
+    
+    p %>% layout(title=paste0(input$var," in ", loc,", ", month, " 2017"), xaxis = list(title = "Date"), yaxis = list(title = paste(input$var, unit)))
+    
+  })
+  
+  # Stats for temporal comparison
+  output$datasetComparison <- renderUI({
+    choices <- append(input$datasets, input$datasetstemp2)
+    req(length(choices) > 0)   # silently wait until choices exist
+    
+    checkboxGroupButtons(
+      "statsOption",
+      "Select two datasets to see their relatedness",
+      choices  = choices,
+      status   = "success",
+      checkIcon = list(yes = icon("ok", lib = "glyphicon"))
+    )
+  })
+  
+  output$stats <- renderUI({   # <-- must be renderUI, not renderText
+    
+    req(isTruthy(input$statsOption))
+    req(length(input$statsOption) == 2)
+    
+    df1 <- grabAnyData(input$statsOption[1], varsDf[input$var, input$statsOption[1]], input$loc, input$season)
+    df2 <- grabAnyData(input$statsOption[2], varsDf[input$var, input$statsOption[2]], input$loc, input$season)
+    
+    if (input$statsOption[1] %in% c("GRIDMET", "NOAA_NCDC", "SNODAS") ||
+        input$statsOption[2] %in% c("GRIDMET", "NOAA_NCDC", "SNODAS")) {
+      df1$Date <- as.Date(df1$Date)
+      df1 <- aggregate(df1$Data, by = list(df1$Date), mean)
+      colnames(df1) <- c("Date", "Data")
+      df2$Date <- as.Date(df2$Date)
+      df2 <- aggregate(df2$Data, by = list(df2$Date), mean)
+      colnames(df2) <- c("Date", "Data")
+    }
+    
+    colnames(df1)[colnames(df1) == "Data"] <- "Data1"
+    colnames(df2)[colnames(df2) == "Data"] <- "Data2"
+    
+    df1$Date <- as.character(df1$Date)
+    df2$Date <- as.character(df2$Date)
+    
+    merged <- merge(df1, df2, by = "Date") |> na.omit()
+    req(nrow(merged) > 2)
+    
+    data1 <- as.numeric(merged$Data1)
+    data2 <- as.numeric(merged$Data2)
+    
+    PCC  <- cor.test(x = data1, y = data2, method = "pearson")
+    bias <- abs((sum(data1) - sum(data2)) / length(data1))
+    RMSE <- sqrt(sum((data1 - data2)^2) / length(data1))
+    
+    HTML(paste0(
+      "<b>Pearson correlation coefficient:</b> ", signif(unname(PCC$estimate), digits = 2),
+      "<br><b>Bias:</b> ", round(bias, digits = 2),
+      "<br><b>RMSE:</b> ", round(RMSE, digits = 2)
+    ))
+  })
+  
+  
+  output$minimap <- renderLeaflet({
+    x = c(-119.65, -104.7552, -155.07)
+    y = c(44.55, 40.8066, 19.7)
+    text = c("John Day, OR", "Nunn, CO", "Hilo, HI")
+    names(x) = names(y) = names(text) = c("OR", "CO", "HI")
+    
+    leaflet() %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addMarkers(lng = x[input$loc3], lat = y[input$loc3], popup = HTML(text[input$loc3])) %>%
+      setView(lng = -97.5, lat = 39, zoom = 2.5)
+  })
+  
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  #______________________________Spatial comparison____________________________
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  
+  output$mapDatasetsOutput <- renderUI({
+    mapDatasets <- c("ERA5", "GLDAS", "GRIDMET", "NCEP", "microclim", "microclimUS","NOAA_NCDC")
+    
+    index <- which(!is.na(varsDf[input$mapVar, ]))
+    choices <- mapDatasets[mapDatasets %in% datasets[index]]
+    
+    pickerInput("mapDatasets", "Dataset to compare", choices = choices, selected = "ERA5",
+                options = list(style = "btn-success", `actions-box` = TRUE))
+  })
+
+  # Stats for spatial comparison
+  statsTable <- reactive({
+    req(input$loc)    # replace validate(need(...)) calls inside this reactive
+    req(input$var)
+    # Collects and returns stats table produced in map_helper.R
+    inputVar <- varsDf[input$mapVar, input$mapDatasets]
+    #change for microclim and microclimus
+    if(inputVar=="TA1cm_0pctShade") inputVar= "TA200cm"
+    if(inputVar=="TA1cm_soil_0") inputVar= "TA120cm"
+    
+    load(paste0("Data/Maps/",input$mapDatasets,"_0",input$month,"_",inputVar,".Rda"))
+    stats$RMSE <- sqrt(stats$RMSE)
+    return(stats)
+  })
+  
+  
+  output$mymap <- renderLeaflet({
+    req(statsTable())   
+    stats <- statsTable()
+    
+    maxRawBias <- max(stats$Bias)
+    maxRawRMSE <- max(stats$RMSE)
+    maxRawPCC <- max(stats$PCC)
+
+    roundUp <- function (percentile, category = "B") {
+      if (category == "B") return (ceiling(maxRawBias * percentile * 10) / 10)
+      else if (category == "R") return (ceiling(maxRawRMSE * percentile * 10) / 10)
+      else if (category == "P") return (ceiling(maxRawPCC * percentile * 10) / 10)
+    }
+    
+    if(input$mapVar == "Air temperature"){
+      # Air temperature bias quantiles: min; 0.84; 2.5; 4.9; max
+      stats$BiasCat <- cut(stats$Bias, c(0, .84, 2.5, 4.9, roundUp(1)), include.lowest = T,
+                           labels = c("Bias < .84",".84 < Bias < 2.5", "2.5 < Bias < 4.9", "Bias > 4.9"))  
+      # Air temperature RMSE quantiles: min; 2.5; 4.2; 5.8; max
+      stats$RMSECat <- cut(stats$RMSE, c(0, 2.5, 4.2, 5.8, roundUp(1)), include.lowest = T,
+                           labels = c("RMSE < 2.5","2.5 < RMSE < 4.2", "4.2 < RMSE < 5.8", "RMSE > 5.8"))  
+      # Air temperature PCC quantiles: min; .77; .86; .92; max
+      stats$PCCCat <- cut(stats$PCC, c(-1, .77, .86, .92, 1), include.lowest = T,
+                          labels = c("PCC < 0.77","0.77 < PCC < 0.86", "0.86 < PCC < 0.92", "PCC > 0.92"))
+    } else if (input$mapVar == "Surface temperature"){
+      # Surface temperature bias quantiles: min; 1.2; 2.8; 6.1; max
+      stats$BiasCat <- cut(stats$Bias, c(0, 1.2, 2.8, 6.1, roundUp(1)), include.lowest = T,
+                           labels = c("Bias < 1.2","1.2 < Bias < 2.8", "2.8 < Bias < 6.1", "Bias > 6.1"))  
+      # Surface temperature RMSE quantiles: min; 4.0; 6.7; 10.3; max
+      stats$RMSECat <- cut(stats$RMSE, c(0, 4, 6.7, 10.3, roundUp(1)), include.lowest = T,
+                           labels = c("RMSE < 4","4 < RMSE < 6.7", "6.7 < RMSE < 10.3", "RMSE > 10.3"))  
+      # Surface temperature PCC quantiles: min; .79; .88; .93; max
+      stats$PCCCat <- cut(stats$PCC, c(-1, .79, .88, .93, 1), include.lowest = T,
+                          labels = c("PCC < 0.79","0.79 < PCC < 0.88", "0.88 < PCC < 0.93", "PCC > 0.93"))
+    } else if (input$mapVar == "Radiation"){
+      # Solar radiation bias quantiles: min; 12.7; 29.8; 55.7; max
+      stats$BiasCat <- cut(stats$Bias, c(0, 12.7, 29.8, 55.7, roundUp(1)), include.lowest = T,
+                           labels = c("Bias < 12.7","12.7 < Bias < 29.8", "29.8 < Bias < 55.7", "Bias > 55.7"))  
+      # Solar radiation RMSE quantiles: min; 66.4; 105.3; 146.9; max
+      stats$RMSECat <- cut(stats$RMSE, c(0, 66.4, 105.3, 146.9, roundUp(1)), include.lowest = T,
+                           labels = c("RMSE < 66.4","66.4 < RMSE < 105.3", "105.3 < RMSE < 146.9", "RMSE > 146.9"))  
+      # Solar radiation PCC quantiles: min; .62; .86; .93; max
+      stats$PCCCat <- cut(stats$PCC, c(-1, .62, .86, .93, 1), include.lowest = T,
+                          labels = c("PCC < 0.62","0.62 < PCC < 0.86", "0.86 < PCC < 0.93", "PCC > 0.93"))
+    }
+        
+    pccCol <- colorFactor(palette = c('#e31a1c','#fd8d3c','#fecc5c','#ffffb2'), stats$PCCCat)
+    biasCol <- colorFactor(palette = c('#ffffb2','#fecc5c','#fd8d3c','#e31a1c'), stats$BiasCat)
+    rmseCol <- colorFactor(palette = c('#ffffb2','#fecc5c','#fd8d3c','#e31a1c'), stats$RMSECat)
+    
+    leaflet() %>%
+      addProviderTiles(providers$ Esri.WorldPhysical) %>%
+      addCircleMarkers(data = stats, lng = ~Lon, lat = ~Lat,
+                       color = ~biasCol(stats$BiasCat),
+                       stroke = TRUE,
+                       radius = 2.5, 
+                       opacity = 1, 
+                       fillOpacity = 1, 
+                       group = "Bias",
+                       popup = paste0(str_replace_all(string = stats$Name, pattern =  "_", replacement = " "), ": ", round(stats$Bias, digits = 2))) %>%
+      addCircleMarkers(data = stats, lng = ~Lon, lat = ~Lat,
+                       color = ~rmseCol(stats$RMSECat),
+                       stroke = TRUE,
+                       radius = 2.5, 
+                       opacity = 1, 
+                       fillOpacity = 1,                        
+                       group = "RMSE",
+                       popup = paste0(str_replace_all(string = stats$Name, pattern =  "_", replacement = " "), ": ", round(stats$RMSE, digits = 2))) %>%
+      addCircleMarkers(data = stats, lng = ~Lon, lat = ~Lat,
+                       color = ~pccCol(stats$PCCCat),
+                       stroke = TRUE,
+                       radius = 2.5, 
+                       opacity = 1, 
+                       fillOpacity = 1,                        
+                       group = "PCC",
+                       popup = paste0(str_replace_all(string = stats$Name, pattern =  "_", replacement = " "), ": ", round(stats$PCC, digits = 2))) %>%
+      addLayersControl(baseGroups = c("Bias", "RMSE", "PCC")) %>%
+      addLegend(pal = biasCol,
+                opacity = 1,
+                values = stats$BiasCat,
+                position = "bottomright",
+                title = "Bias") %>% setView(lng = -100, lat = 40, zoom = 3)
+  })
+  
+  
+  observeEvent(input$mymap_groups, {
+    
+    stats <- statsTable()
+    
+    maxRawBias <- max(stats$Bias)
+    maxRawRMSE <- max(stats$RMSE)
+    maxRawPCC <- max(stats$PCC)
+    
+    roundUp <- function (percentile, category = "B") {
+      if (category == "B") return (ceiling(maxRawBias * percentile * 10) / 10)
+      else if (category == "R") return (ceiling(maxRawRMSE * percentile * 10) / 10)
+      else if (category == "P") return (ceiling(maxRawPCC * percentile * 10) / 10)
+    }
+    
+    if(input$mapVar == "Air temperature"){
+      # Air temperature bias quantiles: min; 0.84; 2.5; 4.9; max
+      stats$BiasCat <- cut(stats$Bias, c(0, .84, 2.5, 4.9, roundUp(1)), include.lowest = T,
+                           labels = c("Bias < .84",".84 < Bias < 2.5", "2.5 < Bias < 4.9", "Bias > 4.9"))  
+      # Air temperature RMSE quantiles: min; 2.5; 4.2; 5.8; max
+      stats$RMSECat <- cut(stats$RMSE, c(0, 2.5, 4.2, 5.8, roundUp(1)), include.lowest = T,
+                           labels = c("RMSE < 2.5","2.5 < RMSE < 4.2", "4.2 < RMSE < 5.8", "RMSE > 5.8"))  
+      # Air temperature PCC quantiles: min; .77; .86; .92; max
+      stats$PCCCat <- cut(stats$PCC, c(-1, .77, .86, .92, 1), include.lowest = T,
+                          labels = c("PCC < 0.77","0.77 < PCC < 0.86", "0.86 < PCC < 0.92", "PCC > 0.92"))
+    } else if (input$mapVar == "Surface temperature"){
+      # Surface temperature bias quantiles: min; 1.2; 2.8; 6.1; max
+      stats$BiasCat <- cut(stats$Bias, c(0, 1.2, 2.8, 6.1, roundUp(1)), include.lowest = T,
+                           labels = c("Bias < 1.2","1.2 < Bias < 2.8", "2.8 < Bias < 6.1", "Bias > 6.1"))  
+      # Surface temperature RMSE quantiles: min; 4.0; 6.7; 10.3; max
+      stats$RMSECat <- cut(stats$RMSE, c(0, 4, 6.7, 10.3, roundUp(1)), include.lowest = T,
+                           labels = c("RMSE < 4","4 < RMSE < 6.7", "6.7 < RMSE < 10.3", "RMSE > 10.3"))  
+      # Surface temperature PCC quantiles: min; .79; .88; .93; max
+      stats$PCCCat <- cut(stats$PCC, c(-1, .79, .88, .93, 1), include.lowest = T,
+                          labels = c("PCC < 0.79","0.79 < PCC < 0.88", "0.88 < PCC < 0.93", "PCC > 0.93"))
+    } else if (input$mapVar == "Radiation"){
+      # Solar radiation bias quantiles: min; 12.7; 29.8; 55.7; max
+      stats$BiasCat <- cut(stats$Bias, c(0, 12.7, 29.8, 55.7, roundUp(1)), include.lowest = T,
+                           labels = c("Bias < 12.7","12.7 < Bias < 29.8", "29.8 < Bias < 55.7", "Bias > 55.7"))  
+      # Solar radiation RMSE quantiles: min; 66.4; 105.3; 146.9; max
+      stats$RMSECat <- cut(stats$RMSE, c(0, 66.4, 105.3, 146.9, roundUp(1)), include.lowest = T,
+                           labels = c("RMSE < 66.4","66.4 < RMSE < 105.3", "105.3 < RMSE < 146.9", "RMSE > 146.9"))  
+      # Solar radiation PCC quantiles: min; .62; .86; .93; max
+      stats$PCCCat <- cut(stats$PCC, c(-1, .62, .86, .93, 1), include.lowest = T,
+                          labels = c("PCC < 0.62","0.62 < PCC < 0.86", "0.86 < PCC < 0.93", "PCC > 0.93"))
+    }
+    
+    pccCol <- colorFactor(palette = c('#e31a1c','#fd8d3c','#fecc5c','#ffffb2'), stats$PCCCat)
+    biasCol <- colorFactor(palette = c('#ffffb2','#fecc5c','#fd8d3c','#e31a1c'), stats$BiasCat)
+    rmseCol <- colorFactor(palette = c('#ffffb2','#fecc5c','#fd8d3c','#e31a1c'), stats$RMSECat)
+    
+    if (input$mymap_groups == "Bias") {
+      leafletProxy('mymap') %>% clearControls() %>%
+        addLegend(pal = biasCol, 
+                  opacity = 1,
+                  values = stats$BiasCat,
+                  group = "Bias legend",
+                  position = "bottomright",
+                  title = "Bias")
+    } else if (input$mymap_groups == "RMSE") {
+      leafletProxy('mymap') %>% clearControls() %>%
+        addLegend(pal = rmseCol,
+                  opacity = 1,
+                  values = stats$RMSECat,
+                  group = "RMSE legend",
+                  position = "bottomright",
+                  title = "Root mean squared error")
+    } else { # PCC
+      leafletProxy('mymap') %>% clearControls() %>%
+        addLegend(pal = pccCol,
+                  opacity = 1,
+                  values = stats$PCCCat,
+                  group = "PCC legend",
+                  position = "bottomright",
+                  title = "Pearson Correlation Coefficient")
+    }
+  })
+
+  
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  #______________________________Operative Temperature_________________________
+  #____________________________________________________________________________
+  #____________________________________________________________________________
+  
+  # Defaults
+  T_g_OR1 = .27 - 5 + 273.15
+  T_g_OR7 = 21 + 5 + 273.15
+  T_g_CO1 = -3 - 5 + 273.15
+  T_g_CO7 = 22 + 5 + 273.15
+  T_g_HI1 = 22 + 5 + 273.15
+  T_g_HI7 = 25 + 5 + 273.15
+
+  Qabs_default = 800
+  u_default = .1
+  
+  # Data set selector
+  output$datasetsOutput3 <- renderUI({
+    
+    sets <- c("USCRN","ERA5","GLDAS","GRIDMET","NEW01","NCEP")
+    index <- which(!is.na(varsDf[input$var, sets]))
+    
+    pickerInput("datasets3", "Forcing & Station Datasets", 
+                choices = sets[index],
+                selected = "USCRN", multiple = T, 
+                options = list(style = "btn-success", `actions-box` = TRUE))
+  })
+  
+  output$datasetsOutput30 <- renderUI({
+    
+    sets <- c("USCRN1cm","ERA51cm","GLDAS1cm","NCEP1cm","microclimUS","microclim","micro_ncep","micro_usa","micro_global","micro_era5")
+    index <- which(!is.na(varsDf[input$var, sets]))
+    
+    pickerInput("datasets30", "Microclimate Functions & Downscaled (1cm) Datasets", 
+                choices = sets[index], selected=NA, multiple = T, 
+                options = list(style = "btn-success", `actions-box` = TRUE))
+  })
+  
+  # Operative temperature function selector
+  output$op3 <- renderUI({
+    pickerInput("op3", "Operative Temperature Function", 
+                choices = c("Small Ectotherm (Gates)" = "gates", "Sceloporus Lizard" = "lizard", "Small Ectotherm (Campbell-Norman)" = "campbell"), 
+                selected = "lizard", multiple = F,
+                options = list(style = "btn-success", `actions-box` = TRUE))
+  })
+  
+  
+  # Rendering selected location/season data
+  output$info3 <- renderUI({
+    if (input$loc3 == "OR") {
+      station3 <- "OR John Day 35 WNW (-119.65°, 44.55°)"
+      loc3 <- "John Day, OR, 2267ft"
+    } else if (input$loc3 == "CO") {
+      station3 <- "CO Nunn 7 NNE (-104.73°, 40.87°)"
+      loc3 <- "Weld county, CO 5900ft"
+    } else if (input$loc3 == "HI") {
+      station3 <- "HI Hilo 5 S (-155.07°, 19.7°)"
+      loc3 <- "Hilo, Hawaii 62ft"
+    }
+    
+    month3 <- ifelse(input$season3 == 1, "January", "July")
+    
+    text3 <- ""
+    for (method in input$datasets3) {
+      text3 <- paste0(text3, "<br><b>", method, ":</b> ")
+      var <- "Air temperature"
+      text3 <- paste0(text3, nameDf[var, method], ", ")
+      var <- "Surface temperature"
+      text3 <- paste0(text3, nameDf[var, method], ", ")
+      var <- "Radiation"
+      text3 <- paste0(text3, nameDf[var, method], ", ")
+      var <- "Wind speed"
+      text3 <- paste0(text3, nameDf[var, method])
+    }
+    
+    HTML("<b><u>Input data for operative temperature estimation</u></b>",
+         text3,
+         "<br><br><b>Station name:</b> ", station3, 
+         "<br><b>Location:</b> ", loc3,
+         "<br><b>Time:</b> ", month3, "1st - 31st, 2017")
+  })
+  
+  # Small location map in sidebar
+  output$minimap3 <- renderLeaflet({
+    x = c(-119.65, -104.7552, -155.07)
+    y = c(44.55, 40.8066, 19.7)
+    text = c("John Day, OR", "Nunn, CO", "Hilo, HI")
+    names(x) = names(y) = names(text) = c("OR", "CO", "HI")
+    
+    leaflet() %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addMarkers(lng = x[input$loc3], lat = y[input$loc3], popup = HTML(text[input$loc3])) %>%
+      setView(lng = -97.5, lat = 39, zoom = 2.5)
+  })
+  
+  
+  # Rendering plot
+  output$plot3 <- renderPlotly({
+    req(input$datasets)
+    
+    colors_special <- list('#b35806', '#542788', '#8073ac', '#e08214', '#b2abd2', '#fdb863', '#fee0b6', '#d8daeb')
+    fig <- plot_ly() %>%
+      layout(xaxis = list(title = "Date"),
+             yaxis = list(title = paste("Operative temperature (degC)")))
+    
+    dates <- vector()
+    
+    # For each selected method
+    for (method in append(input$datasets3,input$datasets30)) {
+      
+      # Get variable name/location
+      aTemp <- varsDf["Air temperature", method]
+      sTemp <- varsDf["Surface temperature", method]
+      radiation<- varsDf["Radiation", method]
+      wind <- varsDf["Wind speed", method]
+      
+      # If it is not a continental-US-only dataset
+      if (input$loc3 != c("HI") || !method %in% c("GRIDMET", "microclimUS", "micro_usa")) { 
+        
+        # Get air temperature data
+        aTemp <- grabAnyData(method, aTemp, input$loc3, input$season3)
+        if(method == "GRIDMET"){
+          aTempTmin <- grabAnyData(method, "tmin", input$loc3, input$season3)
+          aTemp$Data <- rowMeans(cbind(aTemp$Data,aTempTmin$Data))
+        } else if(method == "NOAA_NCDC"){
+          aTempTmin <- grabAnyData(method, "TMIN", input$loc3, input$season3)
+          aTemp$Data <- rowMeans(cbind(aTemp$Data,aTempTmin$Data))
+        }
+        aTemp$Data = aTemp$Data + 273.15 # C to K
+        
+        # Get surface temperature data
+        if (is.na(sTemp)) {
+          if (input$loc3 == c("HI") && input$season3==1) sTemp$Data = array(T_g_HI1, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("HI") && input$season3==7) sTemp$Data = array(T_g_HI7, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("CO") && input$season3==1) sTemp$Data = array(T_g_CO1, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("CO") && input$season3==7) sTemp$Data = array(T_g_CO7, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("OR") && input$season3==1) sTemp$Data = array(T_g_OR1, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("OR") && input$season3==7) sTemp$Data = array(T_g_OR7, dim=c(length(aTemp$Data)))
+        }
+        else {
+          sTemp <- grabAnyData(method, sTemp, input$loc3, input$season3)
+          sTemp$Data = sTemp$Data + 273.15 # C to K
+        }
+        
+        # Get radiation data
+        if (is.na(radiation)) radiation$Data = array(Qabs_default, dim=c(length(aTemp$Data)))
+        else radiation <- grabAnyData(method, radiation, input$loc3, input$season3)
+        
+        # Get wind speed data
+        if (is.na(wind)) wind$Data = array(u_default, dim=c(length(aTemp$Data)))
+        else wind <- grabAnyData(method, wind, input$loc3, input$season3)
+      
+        #----
+        #Set up To calculations
+        
+        # Areas
+        GMASS=8.9
+        ATOTAL=(10.4713*GMASS*0.688)/10000
+        AV=(0.425*GMASS*0.85)/10000 
+        ASILN=(3.798*GMASS*.683)/10000 # MAX. SILHOUETTE AREA (NORMAL TO THE SUN)
+        ASILP=(0.694*GMASS*.743)/10000 # MIN. SILHOUETTE AREA (POINTING TOWARD THE SUN)
+        As=(ASILN + ASILP)/2           # MEAN SILHOUTTE AREA
+        
+        A=sa_from_mass(8.9, "lizard")
+        
+        # characteristic dimension -- cube root of volume
+        D=(volume_from_length(l=0.063,"lizard"))^(1/3)
+        
+        df= partition_solar_radiation(method="Liu_Jordan", kt=0.6) # diffuse fraction of solar radiation, assumes kt=0.6. 
+        
+        H_L=heat_transfer_coefficient_approximation(V=0.1, D=(volume_from_length(l=0.063,"lizard"))^(1/3), K=25.7 * 10^(-3), nu=15.3 * 10^(-6), taxa = "lizard")
+        #Documentation: https://trenchproject.github.io/TrenchR/reference/heat_transfer_coefficient_approximation.html
+        
+        # CALCULATE OPERATIVE TEMPERATURE
+        # radiation absorbed
+        # diffuse is received by half the total area and diffuse below (from reflected, based on substrate reflectivity=0.3) is also received by half the total
+        # solar absorptivity 0.9 from Gates 1980
+        # assumes albedo of 0.3
+        S=radiation$Data # W/m2 measured solar radiation
+        Qabs=0.9*(As*S*(1-df)+A/2*S*(df)+A/2*S*(1-df)*0.3) # direct, diffuse, reflected
+        #---
+        
+        # Initialize operative temperature vector
+        op_temp = array(0, dim=c(length(aTemp$Data)))
+        
+        #set lat, lon elev
+        if (input$loc3 == c("OR")) {lat=44.55; lon=-119.65; elev=691}
+        if (input$loc3 == c("CO")) {lat=40.87; lon=-104.73; elev=1458}
+        
+        # Use selected method to calculate operative temperature
+        if (input$op3=="gates") {
+          
+          op_temp = mapply(Tb_Gates, A=sa_from_mass(8.9, "lizard"), D=(volume_from_length(l=0.063,"lizard"))^(1/3), psa_dir=0.5, psa_ref=0.5, psa_air=0.95, psa_g=0.05, 
+                           T_g=sTemp$Data, T_a=aTemp$Data, Qabs=Qabs, epsilon=0.95, H_L=H_L, K=0.15)
+          fig <- fig %>% layout(title="Small Ectoterm Operative Temperature (Gates Model)")
+          
+        } else if (input$op3=="lizard") {
+          doytemp = sapply(aTemp$Date,day_of_year)
+          hours = hour(as.POSIXct(aTemp$Date))
+          
+          op_temp = mapply(Tb_lizard, T_a=aTemp$Data-273.15, T_g=sTemp$Data-273.15, u=wind$Data, 
+                           svl=63, m=8.9, psi=zenith_angle(doy=doytemp, lat=lat, lon=lon, hour=hours), rho_S=0.3, elev=elev, doy=doytemp)
+          op_temp = op_temp + 273.15 # back to K
+          fig <- fig %>% layout(title="Sceloporus Lizard Operative Temperature")
+          
+        } else if (input$op3=="campbell") {
+          op_temp = mapply(Tb_CampbellNorman, T_a=aTemp$Data, T_g=sTemp$Data, S=radiation$Data, D=(volume_from_length(l=0.063,"lizard"))^(1/3), V=wind$Data)
+          fig <- fig %>% layout(title="Small Ectoterm Operative Temperature (Campbell-Norman Model)")
+        }
+        
+
+        op_temp[op_temp < 0] = NA
+        op_temp = op_temp - 273.15 # To C
+        
+        # add to figure
+        fig <- fig %>% add_lines(x = as.POSIXct(aTemp$Date), y = op_temp, name = method)
+        
+        dates <- aTemp$Date
+      }
+    } 
+    
+    # Add activity range
+    fig <- layout(fig, 
+      shapes = list(
+        list(type = "rect", fillcolor = "green", line = list(color = "green"), opacity = 0.3,
+             x0 = dates[1], x1 = dates[length(dates)], xref = "x", y0 = 32, y1 = 37, yref = "y"))
+    )
+    
+    fig # Return figure
+    
+  })
+  
+  
+  output$stats3 <- renderUI({
+    
+    statistics <- "<h3>Operative Temperature Statistics</h3>"
+    statistics = paste0(statistics,"<p><i>Compares average operative temperatures (°C); ")
+    statistics = paste0(statistics,"hours above a critical thermal maximum of 43 °C; ")
+    statistics = paste0(statistics,"hours of potential activity, defined as operative temperatures falling between 32°C and 37°C; ")
+    statistics = paste0(statistics,"and average resting metabolic rate (W) calculated uing the Qmetabolism_from_mass_temp() function ")
+    statistics = paste0(statistics,"from the TrenchR package assuming 8.9g mass and lizard taxa.</i></p>")
+    
+    HTML(statistics)
+    
+  })
+  
+  output$statsmap <- renderPlotly({
+    
+    method_vec <- vector()
+    avgTe_vec <- vector()
+    CTmax_hours_vec <- vector()
+    activity_hours_vec <- vector()
+    avgQmet_vec <- vector()
+    
+    # For each selected method
+    for (method in append(input$datasets3,input$datasets30)) {
+      
+      # Get variable name/location
+      aTemp <- varsDf["Air temperature", method]
+      sTemp <- varsDf["Surface temperature", method]
+      radiation<- varsDf["Radiation", method]
+      wind <- varsDf["Wind speed", method]
+      
+      # If it is not a continental-US-only dataset
+      if (input$loc3 != c("HI") || !method %in% c("GRIDMET", "microclimUS", "micro_usa")) { 
+        
+        method_vec = append(method_vec, method) 
+        
+        # Get air temperature data
+        if (is.na(aTemp)) aTemp = sTemp$Data = array(T_a, dim=c(length(aTemp$Data)))
+        else {
+          aTemp <- grabAnyData(method, aTemp, input$loc3, input$season3)
+          if(method == "GRIDMET"){
+            aTempTmin <- grabAnyData(method, "tmin", input$loc3, input$season3)
+            aTemp$Data <- rowMeans(cbind(aTemp$Data,aTempTmin$Data))
+          } else if(method == "NOAA_NCDC"){
+            aTempTmin <- grabAnyData(method, "TMIN", input$loc3, input$season3)
+            aTemp$Data <- rowMeans(cbind(aTemp$Data,aTempTmin$Data))
+          }
+          aTemp$Data = aTemp$Data + 273.15 # C to K
+        }
+        
+        # Get surface temperature data
+        if (is.na(sTemp)) {
+          if (input$loc3 == c("HI") && input$season3==1) sTemp$Data = array(T_g_HI1, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("HI") && input$season3==7) sTemp$Data = array(T_g_HI7, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("CO") && input$season3==1) sTemp$Data = array(T_g_CO1, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("CO") && input$season3==7) sTemp$Data = array(T_g_CO7, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("OR") && input$season3==1) sTemp$Data = array(T_g_OR1, dim=c(length(aTemp$Data)))
+          if (input$loc3 == c("OR") && input$season3==7) sTemp$Data = array(T_g_OR7, dim=c(length(aTemp$Data)))
+        }
+        else {
+          sTemp <- grabAnyData(method, sTemp, input$loc3, input$season3)
+          sTemp$Data = sTemp$Data + 273.15 # C to K
+        }
+        
+        # Get radiation data
+        if (is.na(radiation)) radiation$Data = array(Qabs_default, dim=c(length(aTemp$Data)))
+        else radiation <- grabAnyData(method, radiation, input$loc3, input$season3)
+        
+        # Get wind speed data
+        if (is.na(wind)) wind$Data = array(u_default, dim=c(length(aTemp$Data)))
+        else wind <- grabAnyData(method, wind, input$loc3, input$season3)
+        
+        # method data stored in aTemp, sTemp, radiation, wind
+        
+        op_temp = array(0, dim=c(length(aTemp$Data)))
+        
+        # Areas
+        GMASS=8.9
+        ATOTAL=(10.4713*GMASS*0.688)/10000
+        AV=(0.425*GMASS*0.85)/10000 
+        ASILN=(3.798*GMASS*.683)/10000 # MAX. SILHOUETTE AREA (NORMAL TO THE SUN)
+        ASILP=(0.694*GMASS*.743)/10000 # MIN. SILHOUETTE AREA (POINTING TOWARD THE SUN)
+        As=(ASILN + ASILP)/2           # MEAN SILHOUTTE AREA
+        
+        A=sa_from_mass(8.9, "lizard")
+        
+        # characteristic dimension -- cube root of volume
+        D=(volume_from_length(l=0.063,"lizard"))^(1/3)
+        
+        df= partition_solar_radiation(method="Liu_Jordan", kt=0.6) # diffuse fraction of solar radiation, assumes kt=0.6. 
+        
+        H_L=heat_transfer_coefficient_approximation(V=0.1, D=(volume_from_length(l=0.063,"lizard"))^(1/3), K=25.7 * 10^(-3), nu=15.3 * 10^(-6), taxa = "lizard")
+        #Documentation: https://trenchproject.github.io/TrenchR/reference/heat_transfer_coefficient_approximation.html
+        
+        # CALCULATE OPERATIVE TEMPERATURE
+        # radiation absorbed
+        # diffuse is received by half the total area and diffuse below (from reflected, based on substrate reflectivity=0.3) is also received by half the total
+        # solar absorptivity 0.9 from Gates 1980
+        # assumes albedo of 0.3
+        S=radiation$Data # W/m2 measured solar radiation
+        Qabs=0.9*(As*S*(1-df)+A/2*S*(df)+A/2*S*(1-df)*0.3) # direct, diffuse, reflected
+        #---
+        
+        # Initialize operative temperature vector
+        op_temp = array(0, dim=c(length(aTemp$Data)))
+        
+        #set lat, lon elev
+        if (input$loc3 == c("OR")) {lat=44.55; lon=-119.65; elev=691}
+        if (input$loc3 == c("CO")) {lat=40.87; lon=-104.73; elev=1458}
+        
+        # Use selected method to calculate operative temperature
+        if (input$op3=="gates") {
+          
+          op_temp = mapply(Tb_Gates, A=sa_from_mass(8.9, "lizard"), D=(volume_from_length(l=0.063,"lizard"))^(1/3), psa_dir=0.5, psa_ref=0.5, psa_air=0.95, psa_g=0.05, 
+                           T_g=sTemp$Data, T_a=aTemp$Data, Qabs=Qabs, epsilon=0.95, H_L=H_L, K=0.15)
+
+        } else if (input$op3=="lizard") {
+          doytemp = sapply(aTemp$Date,day_of_year)
+          hours = hour(as.POSIXct(aTemp$Date))
+          
+          op_temp = mapply(Tb_lizard, T_a=aTemp$Data-273.15, T_g=sTemp$Data-273.15, u=wind$Data, 
+                           svl=63, m=8.9, psi=zenith_angle(doy=doytemp, lat=lat, lon=lon, hour=hours), rho_S=0.3, elev=elev, doy=doytemp)
+          op_temp = op_temp + 273.15 # back to K
+
+        } else if (input$op3=="campbell") {
+          op_temp = mapply(Tb_CampbellNorman, T_a=aTemp$Data, T_g=sTemp$Data, S=radiation$Data, D=(volume_from_length(l=0.063,"lizard"))^(1/3), V=wind$Data)
+        }
+        
+        op_temp[op_temp < 0] = NA
+        op_temp = op_temp - 273.15 # To C
+        op_tempK = op_temp + 273.15
+        
+        # calculate biostatistics
+        avgTe = mean(op_temp, na.rm=TRUE)
+        ct <- op_temp[op_temp > 43]
+        ct <- ct[!is.na(ct)]
+        CTmax_hours = length(ct)
+        activeLower = op_temp[op_temp >= 32]
+        active = activeLower[activeLower <= 37]
+        active <- active[!is.na(active)]
+        activity_hours = length(active)
+        
+        if (method == "GLDAS"){ # 3 hourly
+          activity_hours = activity_hours * 3
+          CTmax_hours = CTmax_hours * 3
+        } 
+        
+        if (method == "NCEP"){ # 6 hourly
+          activity_hours = activity_hours * 6
+          CTmax_hours = CTmax_hours * 6
+        } 
+        
+        # only has data for one day
+        if(method %in% c("microclim","NEW01")){
+          activity_hours = activity_hours * 31
+          CTmax_hours = CTmax_hours * 31
+        }
+        
+        avgQmet=0
+        avgQmet = mean(try(mapply(Qmetabolism_from_mass_temp, m=8.9, T_b=op_tempK, taxa="reptile")), na.rm=TRUE)
+        
+        # print biostatistics
+        avgTe_vec = append(avgTe_vec, avgTe)
+        if(method %in% c("NOAA_NCDC","GRIDMET")){
+          CTmax_hours_vec = append(CTmax_hours_vec, NA)
+          activity_hours_vec = append(activity_hours_vec, NA)
+        } else {
+          CTmax_hours_vec = append(CTmax_hours_vec, CTmax_hours)
+          activity_hours_vec = append(activity_hours_vec, activity_hours)
+        }
+        avgQmet_vec = append(avgQmet_vec, avgQmet)
+      }
+    } 
+    
+    
+    # font style
+    f <- list(size = 12,color = "black")
+    
+    # annotations
+    a <- list(text = "Average operative temperature (°C)", font = f, xref = "paper", yref = "paper",
+      yanchor = "bottom", xanchor = "center", align = "center", x = 0.5,y = 1, showarrow = FALSE)
+    
+    b <- list(text = "Hours above critical thermal maxima (43°C)", font = f, xref = "paper", yref = "paper",
+      yanchor = "bottom", xanchor = "center", align = "center", x = 0.5, y = 1, showarrow = FALSE)
+    
+    c <- list(text = "Potential activity hours (32°C - 37°C)", font = f, xref = "paper", yref = "paper",
+      yanchor = "bottom", xanchor = "center", align = "center", x = 0.5,y = 1, showarrow = FALSE)
+    
+    d <- list(text = "Average resting metabolic rate (W)", font = f, xref = "paper", yref = "paper",
+      yanchor = "bottom", xanchor = "center", align = "center", x = 0.5,y = 1, showarrow = FALSE)
+    
+    p1 <- plot_ly(x = method_vec, y = avgTe_vec, type = "bar", color = "blue", showlegend=FALSE) %>%
+      layout(annotations = a)
+    
+    p2 <- plot_ly(x = method_vec, y = CTmax_hours_vec, type = "bar", color = "blue", showlegend=FALSE) %>%
+      layout(annotations = b)
+    
+    p3 <- plot_ly(x = method_vec, y = activity_hours_vec, type = "bar", color = "blue", showlegend=FALSE) %>%
+      layout(annotations = c)
+    
+    p4 <- plot_ly(x = method_vec, y = avgQmet_vec, type = "bar", color = "blue", showlegend=FALSE) %>%
+      layout(annotations = d)
+    
+    s1 <- subplot(p1, p2, margin = 0.07)
+    s2 <- subplot(p3, p4, margin = 0.07)
+    fig <- subplot(s1, s2, nrows=2, margin = 0.07) %>%
+      layout(height = 600)
+    fig
+  })
+
+  
+}
